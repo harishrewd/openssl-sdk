@@ -46,7 +46,7 @@ jobs:
           cd openwrt
           export FORCE_UNSAFE_CONFIGURE=1
           
-          # 🔥 THE HOST BUILD PASS: Generates libdeflate-gzip, lua, and compilers cleanly so it never crashes!
+          # 🔥 THE MANDATORY HOST STEP: Builds host compilers inside GitHub's cloud so it never crashes!
           make tools/install -j$(nproc)
           make toolchain/install -j$(nproc)
           
@@ -71,7 +71,7 @@ jobs:
           mkdir -p "$TARGET_BIN_DIR"
           
           find openwrt/build_dir/target-aarch64_cortex-a53_musl/ -type d -name "ipkg-*" | while read -r IPKG_ROOT; do
-            if [ -d "$IPKG_ROOT/libopenssl" ] || [ -d "$IPKG_ROOT/openssl-util" ]; then
+            if [ -d "$IPKG_ROOT/libopenssl" ] || [ -d "$IPKG_ROOT/openssl-util" ] || [ -d "$IPKG_ROOT/libopenssl-conf" ]; then
                echo "Found OpenSSL workspace inside: $IPKG_ROOT"
                find "$IPKG_ROOT" -name "*.apk" -exec cp -v -f {} "$TARGET_BIN_DIR"/ \;
             fi
