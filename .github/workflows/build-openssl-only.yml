@@ -1,4 +1,4 @@
-# Version 1.0.1-SDK-Certified-HardwareCrypto-Pass
+# Version 1.26.0-Production-OpenSSL-Isolated-r600 (Certified Complete OpenSSL Archive)
 name: Fast Build Targeted SDK ARMv8 OpenSSL
 
 on:
@@ -8,7 +8,7 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-      - name: Checkout OpenWrt Core Framework Structures
+      - name: Checkout OpenWrt Core Code
         uses: actions/checkout@v4
         with:
           repository: 'openwrt/openwrt'
@@ -20,44 +20,65 @@ jobs:
           sudo apt update
           sudo apt install -y build-essential clang flex bison g++ gawk gcc-multilib g++-multilib gettext git libncurses5-dev libssl-dev python3-setuptools rsync swig unzip zlib1g-dev file wget zstd libz3-dev
 
-      - name: Inject True ARMv8 Hardware Assembly Flags into OpenSSL Settings
+      - name: Set Up Package Feeds
         run: |
-          OPENSSL_MAKEFILE="openwrt/package/libs/openssl/Makefile"
-          if [ -f "$OPENSSL_MAKEFILE" ]; then
-            echo "⚙️ Injecting hardware architecture flag parameters into build tree..."
-            
-            # 1. Clear out size-optimizations (-Os) and activate your true hardware acceleration loops
-            sed -i '/include \$(INCLUDE_DIR)\/package\.mk/i TARGET_CFLAGS:=\$(filter-out -Os, \$(TARGET_CFLAGS)) -O2 -pipe -march=armv8-a+crc+crypto -mtune=cortex-a53\nEXTRA_CFLAGS:=\$(filter-out -Os, \$(EXTRA_CFLAGS)) -O2 -pipe -march=armv8-a+crc+crypto -mtune=cortex-a53' "$OPENSSL_MAKEFILE"
-            
-            # 2. Hardcode the optimization engine configuration target selector straight to 64-bit ARM assembly
-            sed -i 's|OPENSSL_TARGET:=.*|OPENSSL_TARGET:=linux-aarch64|g' "$OPENSSL_MAKEFILE"
-          else
-            echo "❌ Error: OpenSSL Makefile not found!" && exit 1
-          fi
+          cd openwrt
+          ./scripts/feeds update -a
 
-      - name: Seed Configuration Profiles for MediaTek M30 Block
+      - name: Configure M30 Target Architecture & Build System Matrix
         run: |
           cd openwrt
           echo "CONFIG_TARGET_mediatek=y" > .config
           echo "CONFIG_TARGET_mediatek_filogic=y" >> .config
           echo "CONFIG_TARGET_mediatek_filogic_DEVICE_dlink_aquila-pro-ai-m30-a1=y" >> .config
           
-          # Target configuration options
+          # Force the global compiler optimization sweep (strips -Os constraints)
+          echo 'CONFIG_TARGET_OPTIMIZATION="-O2 -pipe -march=armv8-a+crc+crypto -mtune=cortex-a53"' >> .config
+          
+          # Force inclusion of OpenSSL package profiles inside configuration arrays
           echo "CONFIG_PACKAGE_libopenssl=y" >> .config
           echo "CONFIG_PACKAGE_libopenssl-conf=y" >> .config
           echo "CONFIG_PACKAGE_openssl-util=y" >> .config
-          echo 'CONFIG_TARGET_OPTIMIZATION="-O2 -pipe -march=armv8-a+crc+crypto -mtune=cortex-a53"' >> .config
           make defconfig
 
-      - name: Run Rapid High-Speed Targeted OpenSSL Package Pass
+      - name: Compile Toolchain and OpenSSL Core Only
         run: |
           cd openwrt
           export FORCE_UNSAFE_CONFIGURE=1
           
-          # Force compile only your core crypto binaries inside the standalone profile
-          make package/libs/openssl/compile V=s -j$(nproc)
+          # 🔥 THE HOST BUILD PASS: Generates libdeflate-gzip, lua, and compilers cleanly so it never crashes!
+          make tools/install -j$(nproc)
+          make toolchain/install -j$(nproc)
+          
+          echo "⚙️ Injecting ARMv8 Crypto Engine switches into OpenSSL..."
+          OPENSSL_MAKEFILE="package/libs/openssl/Makefile"
+          if [ -f "$OPENSSL_MAKEFILE" ]; then
+            sed -i '/include \$(INCLUDE_DIR)\/package\.mk/i TARGET_CFLAGS:=\$(filter-out -Os, \$(TARGET_CFLAGS)) -O2 -pipe -march=armv8-a+crc+crypto -mtune=cortex-a53\nEXTRA_CFLAGS:=\$(filter-out -Os, \$(EXTRA_CFLAGS)) -O2 -pipe -march=armv8-a+crc+crypto -mtune=cortex-a53' "$OPENSSL_MAKEFILE"
+            sed -i 's|OPENSSL_TARGET:=.*|OPENSSL_TARGET:=linux-aarch64|g' "$OPENSSL_MAKEFILE"
+            
+            # Compile only your accelerated OpenSSL targets cleanly
+            echo "🏗 Compiling fresh optimized OpenSSL dependencies..."
+            make package/libs/openssl/compile V=s -j$(nproc)
+          else
+            echo "❌ Error: OpenSSL Makefile not found!" && exit 1
+          fi
 
-      - name: Collect and Upload Your Fresh Accelerated OpenSSL APK Packages
+      # 🔥 THE RESCUE OPERATION: Safely captures the generated files before OpenWrt drops them!
+      - name: Rescue Hardware-Accelerated OpenSSL Packages via Wildcard
+        run: |
+          echo "🚀 Gathering optimized OpenSSL APK files from workspace directory..."
+          TARGET_BIN_DIR="openwrt/bin/packages/aarch64_cortex-a53/base"
+          mkdir -p "$TARGET_BIN_DIR"
+          
+          find openwrt/build_dir/target-aarch64_cortex-a53_musl/ -type d -name "ipkg-*" | while read -r IPKG_ROOT; do
+            if [ -d "$IPKG_ROOT/libopenssl" ] || [ -d "$IPKG_ROOT/openssl-util" ]; then
+               echo "Found OpenSSL workspace inside: $IPKG_ROOT"
+               find "$IPKG_ROOT" -name "*.apk" -exec cp -v -f {} "$TARGET_BIN_DIR"/ \;
+            fi
+          done
+          echo "✔ Rescue operation complete."
+
+      - name: Upload All Finished APK Files
         uses: actions/upload-artifact@v4
         with:
           name: dlink-m30-hardware-openssl-apks
