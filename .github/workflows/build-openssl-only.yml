@@ -1,0 +1,64 @@
+# Version 1.0.0-SDK-Certified-HardwareCrypto-Pass
+name: Fast Build Targeted SDK ARMv8 OpenSSL
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Download and Unpack Official OpenWrt Pre-Built SDK Container
+        run: |
+          echo "📥 Fetching official pre-compiled MediaTek Filogic SDK..."
+          wget -q https://openwrt.org
+          tar -xf openwrt-sdk-*.tar.xz
+          mv openwrt-sdk-* openwrt
+
+      - name: Targeted Injection of OpenSSL Core Package Definitions
+        run: |
+          cd openwrt
+          # 🔥 THE CRITICAL SDK FIX: Instead of updating global feeds which breaks tracking alignments,
+          # we cleanly extract and mount *only* the required base library paths into the SDK project structure.
+          git clone --depth=1 -b openwrt-25.12 https://github.com /tmp/openwrt-core
+          mkdir -p package/libs
+          cp -R /tmp/openwrt-core/package/libs/openssl package/libs/
+
+      - name: Inject True ARMv8 Hardware Assembly Flags into SDK Build Staging
+        run: |
+          OPENSSL_MAKEFILE="openwrt/package/libs/openssl/Makefile"
+          if [ -f "$OPENSSL_MAKEFILE" ]; then
+            echo "⚙️ Injecting hardware architecture flag parameters into build tree..."
+            
+            # 1. Clear out size-optimizations (-Os) and activate your true hardware acceleration loops
+            sed -i '/include \$(INCLUDE_DIR)\/package\.mk/i TARGET_CFLAGS:=\$(filter-out -Os, \$(TARGET_CFLAGS)) -O2 -pipe -march=armv8-a+crc+crypto -mtune=cortex-a53\nEXTRA_CFLAGS:=\$(filter-out -Os, \$(EXTRA_CFLAGS)) -O2 -pipe -march=armv8-a+crc+crypto -mtune=cortex-a53' "$OPENSSL_MAKEFILE"
+            
+            # 2. Hardcode the optimization engine configuration target selector straight to 64-bit ARM assembly
+            sed -i 's|OPENSSL_TARGET:=.*|OPENSSL_TARGET:=linux-aarch64|g' "$OPENSSL_MAKEFILE"
+          else
+            echo "❌ Error: OpenSSL Makefile not found!" && exit 1
+          fi
+
+      - name: Seed Configuration Profiles
+        run: |
+          cd openwrt
+          echo "CONFIG_PACKAGE_libopenssl=y" > .config
+          echo "CONFIG_PACKAGE_libopenssl-conf=y" >> .config
+          echo "CONFIG_PACKAGE_openssl-util=y" >> .config
+          echo 'CONFIG_TARGET_OPTIMIZATION="-O2 -pipe -march=armv8-a+crc+crypto -mtune=cortex-a53"' >> .config
+          make defconfig
+
+      - name: Run Rapid High-Speed Targeted OpenSSL Package Pass
+        run: |
+          cd openwrt
+          export FORCE_UNSAFE_CONFIGURE=1
+          
+          # In the isolated SDK container framework, compiling the selected folder target
+          # automatically builds and saves the final installable .apk bundles cleanly without any cleanup sweeps!
+          make package/libs/openssl/compile V=s -j$(nproc)
+
+      - name: Collect and Upload Your Fresh Accelerated OpenSSL APK Packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: dlink-m30-hardware-openssl-apks
+          path: openwrt/bin/**/*.apk
