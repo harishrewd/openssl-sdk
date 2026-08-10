@@ -1,4 +1,4 @@
-# Version 1.0.0-Production-IsolatedLibraryOverride (Certified libevent2, libexpat & libhiredis Only)
+# Version 1.0.0-Production-IsolatedTrueSpeedHijack (Certified Complete Standalone Matrix)
 name: Build Isolated ARMv8 Optimized Support Libraries
 
 on:
@@ -24,7 +24,7 @@ jobs:
         run: |
           cd openwrt
           ./scripts/feeds update -a
-          # FIXED: Explicitly installing hiredis to handle the database driver paths cleanly!
+          # Install the explicit package source paths required for the isolated dependencies
           ./scripts/feeds install hiredis
           ./scripts/feeds install unbound-daemon
 
@@ -35,7 +35,7 @@ jobs:
           echo "CONFIG_TARGET_mediatek_filogic=y" >> .config
           echo "CONFIG_TARGET_mediatek_filogic_DEVICE_dlink_aquila-pro-ai-m30-a1=y" >> .config
           
-          # Target configuration row mappings for the 3 standalone libraries
+          # Target configuration row mappings for ONLY your 3 required libraries
           echo "CONFIG_PACKAGE_libevent2=y" >> .config
           echo "CONFIG_PACKAGE_libexpat=y" >> .config
           echo "CONFIG_PACKAGE_libhiredis=y" >> .config
@@ -51,7 +51,7 @@ jobs:
       - name: Hijack Toolchain Binaries and Force Hardcoded ARMv8 Flags
         run: |
           cd openwrt
-          echo "🔥 Executing absolute GCC compiler wrapper binary hijack loop..."
+          echo "🔥 Executing absolute toolchain compiler wrapper binary hijack loop..."
           TOOLCHAIN_BIN_DIR=$(find staging_dir/ -type d -name "bin" | grep "toolchain-" | head -n 1)
           
           if [ -d "$TOOLCHAIN_BIN_DIR" ]; then
@@ -82,7 +82,7 @@ jobs:
           cd openwrt
           export FORCE_UNSAFE_CONFIGURE=1
           
-          # Compile ONLY your targeted dependency files cleanly
+          # Compile ONLY your targeted dependency files cleanly through the hijacked compilers
           echo "🏗 Compiling hardware-accelerated libevent..."
           make package/libs/libevent2/compile V=s -j$(nproc)
 
