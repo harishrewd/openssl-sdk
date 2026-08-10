@@ -24,6 +24,15 @@ jobs:
           cd openwrt
           ./scripts/feeds update -a
 
+      # 🟩 THE ACCELERATION FORCER: Lock engine choices right inside OpenWrt's package profile definitions
+      - name: Hardcode Hardware Crypto Defaults Into OpenSSL Rules
+        run: |
+          OPENSSL_CONFIG="openwrt/package/libs/openssl/Config.in"
+          if [ -f "$OPENSSL_CONFIG" ]; then
+            echo "⚙️ Hardcoding engine defaults into configuration rules..."
+            sed -i 's|default n|default y|g' "$OPENSSL_CONFIG"
+          fi
+
       - name: Configure M30 Target Architecture
         run: |
           cd openwrt
@@ -31,49 +40,29 @@ jobs:
           echo "CONFIG_TARGET_mediatek_filogic=y" >> .config
           echo "CONFIG_TARGET_mediatek_filogic_DEVICE_dlink_aquila-pro-ai-m30-a1=y" >> .config
           
-          # Target CPU speed optimizations
+          # Target CPU speed enhancements
           echo 'CONFIG_TARGET_OPTIMIZATION="-O2 -pipe -march=armv8-a+crc+crypto -mtune=cortex-a53"' >> .config
           
-          # Native hardware crypto switches
+          # Force hardware acceleration settings to stay on
           echo "CONFIG_PACKAGE_kmod-cryptodev=y" >> .config
           echo "CONFIG_OPENSSL_ENGINE=y" >> .config
           echo "CONFIG_OPENSSL_ENGINE_BUILTIN=y" >> .config
           echo "CONFIG_OPENSSL_ENGINE_BUILTIN_DEVCRYPTO=y" >> .config
 
-          # Standard OpenSSL packages
+          # Define targets
           echo "CONFIG_PACKAGE_libopenssl=y" >> .config
           echo "CONFIG_PACKAGE_libopenssl-conf=y" >> .config
           echo "CONFIG_PACKAGE_openssl-util=y" >> .config
           make defconfig
 
-      - name: Compile Cross Toolchain Baseline
+      - name: Run Unified Target Generation
         run: |
           cd openwrt
           export FORCE_UNSAFE_CONFIGURE=1
-          make tools/install -j$(nproc)
-          make toolchain/install -j$(nproc)
-
-      # 🟩 THE DEFINITIVE FIX: Pre-build target framework dependencies before packing isolated software layers
-      - name: Compile Target OpenSSL Stack
-        run: |
-          cd openwrt
-          export FORCE_UNSAFE_CONFIGURE=1
-          
-          echo "Preparing core target architecture subsystem indicators..."
-          make target/compile -j$(nproc)
-          
-          echo "Compiling optimized OpenSSL core package stack..."
-          make package/libs/openssl/compile V=s -j$(nproc) CONFIG_OPENSSL_ENGINE=y CONFIG_OPENSSL_ENGINE_BUILTIN=y CONFIG_OPENSSL_ENGINE_BUILTIN_DEVCRYPTO=y
-
-      - name: Gather All Output APK Packages
-        run: |
-          TARGET_BIN_DIR="openwrt/bin/packages/aarch64_cortex-a53/base"
-          mkdir -p "$TARGET_BIN_DIR"
-          find openwrt/bin/packages/aarch64_cortex-a53/ -name "*.apk" -exec cp -v -f {} "$TARGET_BIN_DIR"/ \; 2>/dev/null || true
-          find openwrt/bin/targets/mediatek/filogic/kmods/ -name "*cryptodev*.apk" -exec cp -v -f {} "$TARGET_BIN_DIR"/ \; 2>/dev/null || true
+          make -j$(nproc)
 
       - name: Upload Artifact Packages
         uses: actions/upload-artifact@v4
         with:
           name: dlink-m30-openssl-only-packages
-          path: openwrt/bin/**/*.apk
+          path: openwrt/bin/
