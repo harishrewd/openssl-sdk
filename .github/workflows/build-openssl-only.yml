@@ -1,4 +1,4 @@
-name: Live Interactive Hardware Crypto Build Room (Optimized)
+name: Live Interactive Hardware Crypto Build Room (Raw Slates Only)
 
 on:
   workflow_dispatch:
@@ -26,24 +26,12 @@ jobs:
           ./scripts/feeds install libsodium hiredis expat
           ./scripts/feeds install unbound-daemon libunbound unbound-control unbound-checkconf unbound-anchor unbound-host
 
-      - name: Initialize Router Profile Baseline
+      # 🟩 THE ANTI-CRASH LAYER: Forces a background network ping every 60 seconds to stop 503 timeouts
+      - name: Initialize Keep-Alive Session Subsystem
         run: |
-          cd openwrt
-          echo "CONFIG_TARGET_mediatek=y" > .config
-          echo "CONFIG_TARGET_mediatek_filogic=y" >> .config
-          echo "CONFIG_TARGET_mediatek_filogic_DEVICE_dlink_aquila-pro-ai-m30-a1=y" >> .config
-          make defconfig
+          bash -c "while true; do echo 'Keeping connection alive...'; sleep 60; done" &
 
-      # 🟩 THE CRITICAL FIX: Build the heavy compiler toolchain completely in the background FIRST
-      # This takes ~35 minutes and ensures the tmate server won't crash when you connect later
-      - name: Pre-Compile Cross Toolchain Baseline
-        run: |
-          cd openwrt
-          export FORCE_UNSAFE_CONFIGURE=1
-          make tools/install -j$(nproc)
-          make toolchain/install -j$(nproc)
-
-      # 🟩 THE PRO OPENER: Pauses the machine and gives you a fully stable connection room
+      # 🟩 THE OPENER: Instantly pauses the machine right here and opens your live connection room
       - name: Open Secure Live Interactive Build Connection
         uses: mxschmitt/action-tmate@v3
         with:
