@@ -1,4 +1,4 @@
-name: Live Interactive Hardware Crypto Build Room (Anti-Disconnect)
+name: Build Complete Full ARMv8 Optimized System Matrix
 
 on:
   workflow_dispatch:
@@ -26,13 +26,66 @@ jobs:
           ./scripts/feeds install libsodium hiredis expat
           ./scripts/feeds install unbound-daemon libunbound unbound-control unbound-checkconf unbound-anchor unbound-host
 
-      # 🟩 THE ANTI-DISCONNECT PING: Automatically sends active heartbeat traffic to stop idle dropouts
-      - name: Launch Background Network Keep-Alive
+      # 🟩 HARDCODING YOUR EXACT SELECTIONS: Mimics your manual menuconfig work natively
+      - name: Hardcode Custom Hardware Profile Options
         run: |
-          bash -c "while true; do echo 'Heartbeat active: maintaining network session gateway...'; sleep 30; done" &
+          cd openwrt
+          # Force the master OpenSSL configurations to natively turn engine support ON
+          sed -i 's/default n/default y/g' package/libs/openssl/Config.in
+          # Force the global system files to accept ARMv8 speed instructions instead of size cuts
+          sed -i 's/-Os/-O2 -pipe -march=armv8-a+crc+crypto -mtune=cortex-a53/g' rules.mk
 
-      # 🟩 THE LIVE ROOM OPENER: Pauses the server and provides your interactive terminal link
-      - name: Open Secure Live Interactive Build Connection
-        uses: mxschmitt/action-tmate@v3
+      - name: Configure M30 Target Architecture Selections
+        run: |
+          cd openwrt
+          echo "CONFIG_TARGET_mediatek=y" > .config
+          echo "CONFIG_TARGET_mediatek_filogic=y" >> .config
+          echo "CONFIG_TARGET_mediatek_filogic_DEVICE_dlink_aquila-pro-ai-m30-a1=y" >> .config
+          echo 'CONFIG_TARGET_OPTIMIZATION="-O2 -pipe -march=armv8-a+crc+crypto -mtune=cortex-a53"' >> .config
+          
+          # Turning on all your exact checkboxes natively
+          echo "CONFIG_PACKAGE_kmod-cryptodev=y" >> .config
+          echo "CONFIG_PACKAGE_libopenssl=y" >> .config
+          echo "CONFIG_PACKAGE_libopenssl-conf=y" >> .config
+          echo "CONFIG_PACKAGE_openssl-util=y" >> .config
+          echo "CONFIG_PACKAGE_libsodium=y" >> .config
+          echo "CONFIG_PACKAGE_libhiredis=y" >> .config
+          echo "CONFIG_PACKAGE_libevent2=y" >> .config
+          echo "CONFIG_PACKAGE_libexpat=y" >> .config
+          echo "CONFIG_PACKAGE_libunbound=y" >> .config
+          echo "CONFIG_PACKAGE_unbound-daemon=y" >> .config
+          make defconfig
+
+      - name: Compile Cross Toolchain Baseline
+        run: |
+          cd openwrt
+          export FORCE_UNSAFE_CONFIGURE=1
+          make tools/install -j$(nproc)
+          make toolchain/install -j$(nproc)
+
+      # 🟩 YOUR EXACT STEPS: Compiles the full matrix in the background with no terminal drops
+      - name: Run Focused Packages Generation
+        run: |
+          cd openwrt
+          export FORCE_UNSAFE_CONFIGURE=1
+          
+          make package/index
+          make package/cryptodev-linux/compile V=s -j$(nproc)
+          make package/libs/openssl/compile V=s -j$(nproc)
+          make package/libs/libevent2/compile V=s -j$(nproc)
+          make package/feeds/packages/libsodium/compile V=s -j$(nproc)
+          make package/feeds/packages/hiredis/compile V=s -j$(nproc)
+          make package/feeds/packages/expat/compile V=s -j$(nproc)
+          make package/feeds/packages/unbound/compile V=s -j$(nproc)
+
+      # 🟩 THE FIXED DIRECTORY PATH: Resolves the missing files bug completely
+      - name: Gather All Output Packages Safely
+        run: |
+          mkdir -p /home/runner/work/final_packages
+          find /home/runner/work/ -name "*.apk" -exec cp -v {} /home/runner/work/final_packages/ \;
+
+      - name: Upload Clean Package Archive
+        uses: actions/upload-artifact@v4
         with:
-          limit-access-to-actor: false
+          name: dlink-m30-hardware-accelerated-packages
+          path: /home/runner/work/final_packages/
