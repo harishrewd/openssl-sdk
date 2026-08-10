@@ -1,4 +1,4 @@
-# Version 1.0.0-Production-IsolatedLibraryOverride (Certified libevent2 & libexpat Only)
+# Version 1.0.0-Production-IsolatedLibraryOverride (Certified libevent2, libexpat & libhiredis Only)
 name: Build Isolated ARMv8 Optimized Support Libraries
 
 on:
@@ -24,6 +24,8 @@ jobs:
         run: |
           cd openwrt
           ./scripts/feeds update -a
+          # FIXED: Explicitly installing hiredis to handle the database driver paths cleanly!
+          ./scripts/feeds install hiredis
           ./scripts/feeds install unbound-daemon
 
       - name: Configure M30 Target Architecture & Build System Matrix
@@ -33,9 +35,10 @@ jobs:
           echo "CONFIG_TARGET_mediatek_filogic=y" >> .config
           echo "CONFIG_TARGET_mediatek_filogic_DEVICE_dlink_aquila-pro-ai-m30-a1=y" >> .config
           
-          # Target configuration row mappings for the 2 standalone libraries
+          # Target configuration row mappings for the 3 standalone libraries
           echo "CONFIG_PACKAGE_libevent2=y" >> .config
           echo "CONFIG_PACKAGE_libexpat=y" >> .config
+          echo "CONFIG_PACKAGE_libhiredis=y" >> .config
           make defconfig
 
       - name: Fast-Build Cross Toolchain Target Baseline
@@ -74,17 +77,20 @@ jobs:
             echo "❌ Error: Toolchain bin folder not found!" && exit 1
           fi
 
-      - name: Compile Optimized libevent2 & libexpat Modules
+      - name: Compile Optimized libevent2, libexpat & libhiredis Modules
         run: |
           cd openwrt
           export FORCE_UNSAFE_CONFIGURE=1
           
-          # Compile ONLY the two targeted dependencies cleanly
+          # Compile ONLY your targeted dependency files cleanly
           echo "🏗 Compiling hardware-accelerated libevent..."
           make package/libs/libevent2/compile V=s -j$(nproc)
 
           echo "🏗 Compiling hardware-accelerated libexpat..."
           make package/feeds/packages/expat/compile V=s -j$(nproc)
+
+          echo "🏗 Compiling hardware-accelerated libhiredis..."
+          make package/feeds/packages/hiredis/compile V=s -j$(nproc)
 
       - name: Rescue Isolated Packages via Wildcard Finder
         run: |
@@ -93,7 +99,7 @@ jobs:
           mkdir -p "$TARGET_BIN_DIR"
           
           find openwrt/build_dir/target-aarch64_cortex-a53_musl/ -type d -name "ipkg-*" | while read -r IPKG_ROOT; do
-             if [ -d "$IPKG_ROOT/libevent2" ] || [ -d "$IPKG_ROOT/libevent2-7" ] || [ -d "$IPKG_ROOT/libexpat" ]; then
+             if [ -d "$IPKG_ROOT/libevent2" ] || [ -d "$IPKG_ROOT/libevent2-7" ] || [ -d "$IPKG_ROOT/libexpat" ] || [ -d "$IPKG_ROOT/libhiredis" ]; then
                 find "$IPKG_ROOT" \( -name "*.apk" -o -name "*.ipk" \) -exec cp -v -f {} "$TARGET_BIN_DIR"/ \;
              fi
           done
