@@ -1,4 +1,4 @@
-name: Live Interactive Hardware Crypto Build Room
+name: Live Interactive Hardware Crypto Build Room (Optimized)
 
 on:
   workflow_dispatch:
@@ -23,7 +23,7 @@ jobs:
         run: |
           cd openwrt
           ./scripts/feeds update -a
-          ./scripts/feeds install libsodium hiredis
+          ./scripts/feeds install libsodium hiredis expat
           ./scripts/feeds install unbound-daemon libunbound unbound-control unbound-checkconf unbound-anchor unbound-host
 
       - name: Initialize Router Profile Baseline
@@ -34,7 +34,16 @@ jobs:
           echo "CONFIG_TARGET_mediatek_filogic_DEVICE_dlink_aquila-pro-ai-m30-a1=y" >> .config
           make defconfig
 
-      # 🟩 THE PRO GUARANTEE: Pause the server and open a live interface connection room
+      # 🟩 THE CRITICAL FIX: Build the heavy compiler toolchain completely in the background FIRST
+      # This takes ~35 minutes and ensures the tmate server won't crash when you connect later
+      - name: Pre-Compile Cross Toolchain Baseline
+        run: |
+          cd openwrt
+          export FORCE_UNSAFE_CONFIGURE=1
+          make tools/install -j$(nproc)
+          make toolchain/install -j$(nproc)
+
+      # 🟩 THE PRO OPENER: Pauses the machine and gives you a fully stable connection room
       - name: Open Secure Live Interactive Build Connection
         uses: mxschmitt/action-tmate@v3
         with:
