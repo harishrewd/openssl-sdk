@@ -24,17 +24,13 @@ jobs:
           cd openwrt
           ./scripts/feeds update -a
 
-      # 🟩 THE PROFESSIONAL METHOD: Injecting the dependencies into OpenWrt's core profile definition file
-      - name: Lock Down Hardware Crypto Engine Rules Natively
+      # 🟩 THE DEFINITIVE ENGINE LOCK: Hardcode engine support directly into OpenWrt's configuration source rules
+      - name: Hardcode Hardware Crypto Defaults Into OpenSSL Rules
         run: |
           cd openwrt
-          # This forces OpenWrt's configuration utility to natively treat engines as active defaults
           sed -i 's/default n/default y/g' package/libs/openssl/Config.in
-          
-          # Force the global compiler rules file to accept ARMv8 optimizations over standard size savings
           sed -i 's/-Os/-O2 -pipe -march=armv8-a+crc+crypto -mtune=cortex-a53/g' rules.mk
 
-      # This creates a baseline configuration file containing your router profile
       - name: Configure M30 Target Architecture
         run: |
           cd openwrt
@@ -42,14 +38,13 @@ jobs:
           echo "CONFIG_TARGET_mediatek_filogic=y" >> .config
           echo "CONFIG_TARGET_mediatek_filogic_DEVICE_dlink_aquila-pro-ai-m30-a1=y" >> .config
           
-          # Force lock the package targets to built-in
+          # Force packages to built-in state
           echo "CONFIG_PACKAGE_kmod-cryptodev=y" >> .config
           echo "CONFIG_PACKAGE_libopenssl=y" >> .config
           echo "CONFIG_PACKAGE_libopenssl-conf=y" >> .config
           echo "CONFIG_PACKAGE_openssl-util=y" >> .config
           make defconfig
 
-      # Builds the cross-compilers for your MediaTek Cortex-A53 processor
       - name: Compile Cross Toolchain Baseline
         run: |
           cd openwrt
@@ -57,23 +52,21 @@ jobs:
           make tools/install -j$(nproc)
           make toolchain/install -j$(nproc)
 
-      # 🟩 THE CRITICAL STEP: Tells OpenWrt to compile ONLY the kernel and OpenSSL package targets 
-      # This skips the huge 45MB image build completely, saving disk space and time
-      - name: Run Focused Package Generation
+      # 🟩 FOCUSED COMPILATION PASS: Safely compile only the targets we need to avoid system bloat
+      - name: Compile Target OpenSSL Stack
         run: |
           cd openwrt
           export FORCE_UNSAFE_CONFIGURE=1
           
-          echo "Building package index maps..."
+          echo "Building package dependency index map..."
           make package/index
           
-          echo "Compiling hardware crypto bridge..."
+          echo "Compiling hardware crypto bridge package..."
           make package/cryptodev-linux/compile V=s -j$(nproc)
           
-          echo "Compiling hardware-accelerated OpenSSL stack..."
+          echo "Compiling hardware-accelerated OpenSSL binaries..."
           make package/libs/openssl/compile V=s -j$(nproc)
 
-      # Gathers only your compiled target modules, ignoring default system junk
       - name: Gather Output Artifacts
         run: |
           TARGET_BIN_DIR="openwrt/bin/packages/aarch64_cortex-a53/base"
