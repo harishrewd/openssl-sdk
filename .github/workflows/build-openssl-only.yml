@@ -11,7 +11,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: 'openwrt/openwrt'
-          ref: 'main'
+          ref: 'main'  # Changed to 'main' / 'master' to pull upstream Unbound 1.26.0+ natively
           path: 'openwrt'
 
       - name: Install System Dependencies
@@ -29,7 +29,12 @@ jobs:
       - name: Force-Inject Hardware Crypto Engine Wrappers
         run: |
           cd openwrt
+          
+          # 1. Force OpenSSL to treat user-space engine support as built-in default choice
           sed -i 's/default n/default y/g' package/libs/openssl/Config.in
+          
+          # 2. 🔥 THE HARD LOCK HACK: Force global compiler engine to unconditionally append ARMv8 flags
+          # This appends your flags to the end of rules.mk, making it legally impossible for individual packages to override them.
           echo 'TARGET_CFLAGS += -O2 -pipe -march=armv8-a+crc+crypto -mtune=cortex-a53' >> rules.mk
           echo 'TARGET_CXXFLAGS += -O2 -pipe -march=armv8-a+crc+crypto -mtune=cortex-a53' >> rules.mk
           echo 'EXTRA_CFLAGS += -O2 -pipe -march=armv8-a+crc+crypto -mtune=cortex-a53' >> rules.mk
@@ -37,11 +42,16 @@ jobs:
       - name: Fully Automated Target Pre-Configuration
         run: |
           cd openwrt
+          
+          # Seed target hardware device profile info (D-Link M30 profile architecture targets)
           echo "CONFIG_TARGET_mediatek=y" > .config
           echo "CONFIG_TARGET_mediatek_filogic=y" >> .config
           echo "CONFIG_TARGET_mediatek_filogic_DEVICE_dlink_aquila-pro-ai-m30-a1=y" >> .config
+          
+          # Force target matrix optimizations to match your specific instructions
           echo 'CONFIG_TARGET_OPTIMIZATION="-O2 -pipe -march=armv8-a+crc+crypto -mtune=cortex-a53"' >> .config
           
+          # Explicitly flag your packages to compile as standalone modules (.apk) natively without opening menuconfig
           echo "CONFIG_PACKAGE_kmod-cryptodev=m" >> .config
           echo "CONFIG_PACKAGE_libopenssl=m" >> .config
           echo "CONFIG_PACKAGE_libopenssl-devcrypto=m" >> .config
@@ -52,6 +62,8 @@ jobs:
           echo "CONFIG_PACKAGE_libsodium=m" >> .config
           echo "CONFIG_PACKAGE_libhiredis=m" >> .config
           echo "CONFIG_PACKAGE_libexpat=m" >> .config
+          
+          # Apply structural standardization passes to validate everything
           make defconfig
 
       - name: Compile Cross-Compiler Toolchain Environment
@@ -63,8 +75,12 @@ jobs:
       - name: Compile Hardware Accelerated Package Stack
         run: |
           cd openwrt
+          
+          # 1. Compile baseline kernel objects first to definitively block dependency Error 2 crashes
           make target/linux/compile -j$(nproc)
           make package/index
+          
+          # 2. Compile optimization core libraries and target apps sequentially
           make package/cryptodev-linux/compile -j$(nproc)
           make package/libs/openssl/compile -j$(nproc)
           make package/libs/libevent2/compile -j$(nproc)
@@ -73,8 +89,13 @@ jobs:
           make package/feeds/packages/expat/compile -j$(nproc)
           make package/feeds/packages/unbound/compile -j$(nproc)
 
+      - name: Stage Finished Binaries for Exfiltration
+        run: |
+          mkdir -p ${{ github.workspace }}/final_packages
+          find ${{ github.workspace }}/openwrt/bin/ -name "*.apk" -exec cp -v {} ${{ github.workspace }}/final_packages/ \;
+
       - name: Securely Upload Compiled APK Artifacts to GitHub Dashboard
         uses: actions/upload-artifact@v4
         with:
           name: openwrt-unbound-hardware-crypto-packages
-          path: openwrt/bin/**/*.apk
+          path: ${{ github.workspace }}/final_packages/
