@@ -1,4 +1,4 @@
-name: Live Interactive Hardware Crypto Build Room (Crypto Forced First)
+name: Live Interactive Hardware Crypto Build Room (Save First Pass)
 
 on:
   workflow_dispatch:
@@ -26,46 +26,12 @@ jobs:
           ./scripts/feeds install libsodium hiredis expat
           ./scripts/feeds install unbound-daemon libunbound unbound-control unbound-checkconf unbound-anchor unbound-host
 
-      # 🟩 THE CRITICAL STEP: Injecting your hardware options BEFORE opening the live room
-      - name: Force Hardware Crypto Subsystem Defaults Into Core Source Natively
-        run: |
-          cd openwrt
-          
-          # 1. Force the master OpenSSL menu definitions to natively treat engine routing as active
-          sed -i 's/default n/default y/g' package/libs/openssl/Config.in
-          
-          # 2. Force the global compiler optimization rules file to accept ARMv8 speed instructions over size cuts
-          sed -i 's/-Os/-O2 -pipe -march=armv8-a+crc+crypto -mtune=cortex-a53/g' rules.mk
-          
-          # 3. Pre-seed the configuration track files with your exact architecture layout and optimizations
-          echo "CONFIG_TARGET_mediatek=y" > .config
-          echo "CONFIG_TARGET_mediatek_filogic=y" >> .config
-          echo "CONFIG_TARGET_mediatek_filogic_DEVICE_dlink_aquila-pro-ai-m30-a1=y" >> .config
-          echo 'CONFIG_TARGET_OPTIMIZATION="-O2 -pipe -march=armv8-a+crc+crypto -mtune=cortex-a53"' >> .config
-          
-          # 4. Turn on all your required hardware drivers right in the seed file
-          echo "CONFIG_PACKAGE_kmod-cryptodev=y" >> .config
-          echo "CONFIG_OPENSSL_ENGINE=y" >> .config
-          echo "CONFIG_OPENSSL_ENGINE_BUILTIN=y" >> .config
-          echo "CONFIG_OPENSSL_ENGINE_BUILTIN_DEVCRYPTO=y" >> .config
-          echo "CONFIG_PACKAGE_libopenssl=y" >> .config
-          echo "CONFIG_PACKAGE_libopenssl-conf=y" >> .config
-          echo "CONFIG_PACKAGE_openssl-util=y" >> .config
-          echo "CONFIG_PACKAGE_libsodium=y" >> .config
-          echo "CONFIG_PACKAGE_libhiredis=y" >> .config
-          echo "CONFIG_PACKAGE_libevent2=y" >> .config
-          echo "CONFIG_PACKAGE_libexpat=y" >> .config
-          echo "CONFIG_PACKAGE_libunbound=y" >> .config
-          echo "CONFIG_PACKAGE_unbound-daemon=y" >> .config
-          
-          make defconfig
-
-      # 🟩 THE ANTI-DISCONNECT HEARTBEAT: Automatically sends data traffic to stop idle dropouts
+      # 🟩 ANTI-DISCONNECT HEARTBEAT: Automatically sends data traffic to stop idle dropouts
       - name: Launch Background Network Keep-Alive
         run: |
           bash -c "while true; do echo 'Heartbeat active: maintaining network session gateway...'; sleep 30; done" &
 
-      # 🟩 THE LIVE ROOM OPENER: Pauses the machine right here and opens your interactive connection room
+      # 🟩 THE PRO OPENER: Pauses the machine right here BEFORE any toolchain compilation happens
       - name: Open Secure Live Interactive Build Connection
         uses: mxschmitt/action-tmate@v3
         with:
