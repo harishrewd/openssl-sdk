@@ -23,7 +23,7 @@ jobs:
         run: |
           cd openwrt
           ./scripts/feeds update -a
-          ./scripts/feeds install libsodium hiredis expat
+          ./scripts/feeds install libsodium hiredis expat libmnl
           ./scripts/feeds install unbound-daemon libunbound unbound-control unbound-checkconf unbound-anchor unbound-host
 
       - name: Hard-Coded Tweak of Unbound Suite Version and Engine Manifest
@@ -35,14 +35,56 @@ jobs:
             sed -i 's|PKG_HASH:=.*|PKG_HASH:=77458a7156e275c0b7b17fabcb357cb12445d95cfcb26fb9bb7d5ecba45e0b63|g' "$MAKEFILE_PATH"
             sed -i 's|PKG_RELEASE:=.*|PKG_RELEASE:=600|g' "$MAKEFILE_PATH"
             
-            # Map parameters cleanly inside core configuration arguments array
-            sed -i 's|--enable-tfo-server|--enable-tfo-server --enable-cachedb --with-libhiredis=$(STAGING_DIR)/usr|g' "$MAKEFILE_PATH"
+            # 🔍 TCP FAST OPEN (TFO) LOCK: Maps parameters cleanly inside core configuration arguments array including TCP Fast Open, CacheDB, and CFLAGS
+            sed -i 's|--enable-tfo-server|--enable-tfo-server --enable-tfo-client --enable-cachedb --with-libhiredis=$(STAGING_DIR)/usr|g' "$MAKEFILE_PATH"
+            
+            # 🔍 THE MODULE RECOVERY WATCH: Explicitly verifies and preserves your exact module compilation sequence
             sed -i 's|subnetcache ipset respip validator iterator|subnetcache ipset respip validator cachedb iterator|g' "$MAKEFILE_PATH"
-            sed -i 's|\$(call Package/unbound/Default)|\$(call Package/unbound/Default)\n  DEPENDS+= +libhiredis|g' "$MAKEFILE_PATH"
+            
+            # Append Redis library dependency mapping tracking hooks
+            sed -i 's|\$(call Package/unbound/Default)|\$(call Package/unbound/Default)\n  DEPENDS+= +libhiredis +libmnl|g' "$MAKEFILE_PATH"
+            
+            # 🔍 THE SYMBOL STRIPPER: Removes allsymbols flag mapping to keep your optimization layouts clean
             sed -i 's|--enable-allsymbols||g' "$MAKEFILE_PATH"
           else
             echo "❌ Error: Unbound Makefile not found!" && exit 1
           fi
+
+      # 🟩 AUTOMATED PRE-SEED SELECTION LAYER: Automatically locks all modules on BEFORE opening terminal
+      - name: Pre-Configure Target Profile and Core Feature Modules
+        run: |
+          cd openwrt
+          echo "CONFIG_TARGET_mediatek=y" > .config
+          echo "CONFIG_TARGET_mediatek_filogic=y" >> .config
+          echo "CONFIG_TARGET_mediatek_filogic_DEVICE_dlink_aquila-pro-ai-m30-a1=y" >> .config
+          
+          # Force inclusion of all complete 11-file package selection matrices explicitly
+          echo "CONFIG_PACKAGE_kmod-cryptodev=m" >> .config
+          echo "CONFIG_PACKAGE_libopenssl=m" >> .config
+          echo "CONFIG_PACKAGE_libopenssl-conf=m" >> .config
+          echo "CONFIG_PACKAGE_libopenssl-devcrypto=m" >> .config
+          echo "CONFIG_PACKAGE_libopenssl-engine=m" >> .config
+          echo "CONFIG_PACKAGE_openssl-util=m" >> .config
+          echo "CONFIG_PACKAGE_libmnl=m" >> .config
+          echo "CONFIG_PACKAGE_libsodium=m" >> .config
+          echo "CONFIG_PACKAGE_libhiredis=m" >> .config
+          echo "CONFIG_PACKAGE_libexpat=m" >> .config
+          echo "CONFIG_PACKAGE_libevent2=m" >> .config
+          echo "CONFIG_PACKAGE_libunbound=m" >> .config
+          echo "CONFIG_PACKAGE_unbound-daemon=m" >> .config
+          echo "CONFIG_PACKAGE_unbound-control=m" >> .config
+          echo "CONFIG_PACKAGE_unbound-control-setup=m" >> .config
+          echo "CONFIG_PACKAGE_unbound-checkconf=m" >> .config
+          echo "CONFIG_PACKAGE_unbound-anchor=m" >> .config
+          echo "CONFIG_PACKAGE_unbound-host=m" >> .config
+          
+          # 🔍 THE HARDWARE MODULE LOCKS: Force hard-lock injection of all required sub-module expansion features from your old workflow layout
+          echo "CONFIG_PACKAGE_libunbound_dnscrypt=y" >> .config  # ➔ 🔥 DNSCRYPT ACCELERATION LAYER
+          echo "CONFIG_PACKAGE_libunbound_ipset=y" >> .config
+          echo "CONFIG_PACKAGE_libunbound_libevent=y" >> .config
+          echo "CONFIG_PACKAGE_libunbound_libpthread=y" >> .config
+          echo "CONFIG_PACKAGE_libunbound_subnet=y" >> .config   # ➔ 🔥 SUBNETCACHE LAYER
+          make defconfig
 
       # 🟩 ANTI-DISCONNECT HEARTBEAT: Automatically sends data traffic to stop idle dropouts
       - name: Launch Background Network Keep-Alive
