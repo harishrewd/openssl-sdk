@@ -1,4 +1,4 @@
-name: Live Interactive Hardware Crypto Build Room (Save First Pass)
+name: Full Automated Hardware Crypto Build Room (Auto-Download)
 
 on:
   workflow_dispatch:
@@ -11,7 +11,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: 'openwrt/openwrt'
-          ref: 'openwrt-25.12'
+          ref: 'main'
           path: 'openwrt'
 
       - name: Install System Dependencies
@@ -26,21 +26,55 @@ jobs:
           ./scripts/feeds install libsodium hiredis expat
           ./scripts/feeds install unbound-daemon libunbound unbound-control unbound-checkconf unbound-anchor unbound-host
 
-      # 🟩 ANTI-DISCONNECT HEARTBEAT: Automatically sends data traffic to stop idle dropouts
-      - name: Launch Background Network Keep-Alive
+      - name: Force-Inject Hardware Crypto Engine Wrappers
         run: |
-          bash -c "while true; do echo 'Heartbeat active: maintaining network session gateway...'; sleep 30; done" &
+          cd openwrt
+          sed -i 's/default n/default y/g' package/libs/openssl/Config.in
+          echo 'TARGET_CFLAGS += -O2 -pipe -march=armv8-a+crc+crypto -mtune=cortex-a53' >> rules.mk
+          echo 'TARGET_CXXFLAGS += -O2 -pipe -march=armv8-a+crc+crypto -mtune=cortex-a53' >> rules.mk
+          echo 'EXTRA_CFLAGS += -O2 -pipe -march=armv8-a+crc+crypto -mtune=cortex-a53' >> rules.mk
 
-      # 🟩 THE PRO OPENER: Pauses the machine right here BEFORE any toolchain compilation happens
-      - name: Open Secure Live Interactive Build Connection
-        uses: mxschmitt/action-tmate@v3
-        with:
-          limit-access-to-actor: false
+      - name: Fully Automated Target Pre-Configuration
+        run: |
+          cd openwrt
+          echo "CONFIG_TARGET_mediatek=y" > .config
+          echo "CONFIG_TARGET_mediatek_filogic=y" >> .config
+          echo "CONFIG_TARGET_mediatek_filogic_DEVICE_dlink_aquila-pro-ai-m30-a1=y" >> .config
+          echo 'CONFIG_TARGET_OPTIMIZATION="-O2 -pipe -march=armv8-a+crc+crypto -mtune=cortex-a53"' >> .config
+          
+          echo "CONFIG_PACKAGE_kmod-cryptodev=m" >> .config
+          echo "CONFIG_PACKAGE_libopenssl=m" >> .config
+          echo "CONFIG_PACKAGE_libopenssl-devcrypto=m" >> .config
+          echo "CONFIG_PACKAGE_libopenssl-engine=m" >> .config
+          echo "CONFIG_PACKAGE_unbound-daemon=m" >> .config
+          echo "CONFIG_PACKAGE_unbound-control=m" >> .config
+          echo "CONFIG_PACKAGE_libevent2=m" >> .config
+          echo "CONFIG_PACKAGE_libsodium=m" >> .config
+          echo "CONFIG_PACKAGE_libhiredis=m" >> .config
+          echo "CONFIG_PACKAGE_libexpat=m" >> .config
+          make defconfig
 
-      # 🟩 THE FIXER: This step automatically runs the exact second you type 'exit' inside your live terminal
+      - name: Compile Cross-Compiler Toolchain Environment
+        run: |
+          cd openwrt
+          make tools/install -j$(nproc)
+          make toolchain/install -j$(nproc)
+
+      - name: Compile Hardware Accelerated Package Stack
+        run: |
+          cd openwrt
+          make target/linux/compile -j$(nproc)
+          make package/index
+          make package/cryptodev-linux/compile -j$(nproc)
+          make package/libs/openssl/compile -j$(nproc)
+          make package/libs/libevent2/compile -j$(nproc)
+          make package/feeds/packages/libsodium/compile -j$(nproc)
+          make package/feeds/packages/hiredis/compile -j$(nproc)
+          make package/feeds/packages/expat/compile -j$(nproc)
+          make package/feeds/packages/unbound/compile -j$(nproc)
+
       - name: Securely Upload Compiled APK Artifacts to GitHub Dashboard
-        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: openwrt-unbound-crypto-packages
-          path: /home/runner/work/final_packages/
+          name: openwrt-unbound-hardware-crypto-packages
+          path: openwrt/bin/**/*.apk
